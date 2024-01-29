@@ -1,0 +1,62 @@
+name: codspeed-benchmarks
+
+on:
+  # Run on pushes to the main branch
+  push:
+    branches:
+      - "main"
+  # Run on pull requests
+  pull_request:
+  # `workflow_dispatch` allows CodSpeed to trigger backtest
+  # performance analysis in order to generate initial data.
+  workflow_dispatch:
+    inputs:
+      bench-mode:
+        type: choice
+        description: "Which bench mode, can be either 'tinybench', 'tinybench:testcontainers', 'vitest:e2e', 'vitest:e2e:testcontainers'"
+        default: "vitest:e2e"
+        options:
+          - tinybench
+          - tinybench:testcontainers
+          - vitest:e2e
+          - vitest:e2e:testcontainers
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set bench-mode
+        id: set-bench-mode
+        # make sure that bench-mode is set even if github.event.inputs.bench-mode is not set
+        run: |
+          echo "bench-mode=${{ github.event.inputs.bench-mode || 'vitest:e2e' }}" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v3
+        with:
+          cache: pnpm
+          node-version-file: .nvmrc
+      - uses: art049/mongodb-cluster-action@v0
+        # run if bench-mode does not include testcontainers
+        if: ${{ !contains(steps.set-bench-mode.outputs.bench-mode, 'testcontainers') }}
+        id: mongodb-cluster-action
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@feat/mongo-tracer
+        with:
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          instruments: mongodb
+          # if not running in `testcontainers` mode set the `mongo-uri-env-name` input to `MONGO_URL`, otherwise set it to an empty string
+          mongo-uri-env-name: ${{ !contains(steps.set-bench-mode.outputs.bench-mode, 'testcontainers') && 'MONGO_URL' || '' }}
+          runner-version: 2.1.1-beta.2
+          run: |
+            rm .env.test
+            pnpm bench:${{ steps.set-bench-mode.outputs.bench-mode }}
+        env:
+          # we need the MONGO_URL to be set in the environment before actually running the benchmark command
+          # so we set it here instead of inside the `run` command
+          MONGO_URL: mongodb://127.0.0.1:27017
