@@ -46,13 +46,12 @@ jobs:
         run: pnpm install
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@feat/mongo-tracer
+        uses: CodSpeedHQ/action@v2
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           instruments: mongodb
           # if not running in `testcontainers` mode set the `mongo-uri-env-name` input to `MONGO_URL`, otherwise set it to an empty string
           mongo-uri-env-name: ${{ !contains(steps.set-bench-mode.outputs.bench-mode, 'testcontainers') && 'MONGO_URL' || '' }}
-          runner-version: 2.1.1-beta.2
           run: |
             rm .env.test
             pnpm bench:${{ steps.set-bench-mode.outputs.bench-mode }}
