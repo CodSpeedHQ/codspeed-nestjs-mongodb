@@ -8,7 +8,7 @@ export class Cat {
   @Prop({ index: 1, required: true })
   name: string;
 
-  @Prop({ required: true })
+  @Prop({ index: 1, required: true })
   age: number;
 
   @Prop({ required: true })
